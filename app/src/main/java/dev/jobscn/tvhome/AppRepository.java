@@ -23,7 +23,10 @@ final class AppRepository {
    for(ResolveInfo r:resolved){try{
     ActivityInfo a=r.activityInfo;
     if(a==null||!a.enabled||!a.exported||a.packageName.equals(context.getPackageName())||byPackage.containsKey(a.packageName))continue;
-    byPackage.put(a.packageName,new AppEntry(new ComponentName(a.packageName,a.name),r.loadLabel(pm).toString()));
+    String label="";try{CharSequence value=r.loadLabel(pm);if(value!=null)label=value.toString().trim();}catch(RuntimeException ignored){}
+    if(label.isEmpty())try{CharSequence value=a.applicationInfo.loadLabel(pm);if(value!=null)label=value.toString().trim();}catch(RuntimeException ignored){}
+    if(label.isEmpty())label=a.packageName;
+    byPackage.put(a.packageName,new AppEntry(new ComponentName(a.packageName,a.name),label));
     }catch(RuntimeException badApp){}
    }
   }
@@ -34,12 +37,12 @@ final class AppRepository {
   String key=app.key()+":"+width+"x"+height; Bitmap hit=icons.get(key); if(hit!=null){done.accept(hit);return;}
   worker.execute(()->{Bitmap bitmap=null;try{
    ActivityInfo info=context.getPackageManager().getActivityInfo(app.component,0);
-   Drawable d=info.loadBanner(context.getPackageManager()); if(d==null)d=info.loadIcon(context.getPackageManager());
+   Drawable d;try{d=info.loadBanner(context.getPackageManager());}catch(RuntimeException badBanner){d=null;} if(d==null)d=info.loadIcon(context.getPackageManager());
    bitmap=Bitmap.createBitmap(width,height,Bitmap.Config.ARGB_8888);Canvas canvas=new Canvas(bitmap);
    float scale=Math.min((float)width/Math.max(1,d.getIntrinsicWidth()),(float)height/Math.max(1,d.getIntrinsicHeight()));
    int w=Math.max(1,(int)(d.getIntrinsicWidth()*scale)),h=Math.max(1,(int)(d.getIntrinsicHeight()*scale));
    d.setBounds((width-w)/2,(height-h)/2,(width+w)/2,(height+h)/2);d.draw(canvas);icons.put(key,bitmap);
-  }catch(Exception ignored){} final Bitmap image=bitmap;main.post(()->{if(!closed)done.accept(image);});});
+  }catch(Exception ignored){bitmap=null;} final Bitmap image=bitmap;main.post(()->{if(!closed)done.accept(image);});});
  }
  void clear(){icons.evictAll();}
  void close(){closed=true;worker.shutdownNow();main.removeCallbacksAndMessages(null);icons.evictAll();}

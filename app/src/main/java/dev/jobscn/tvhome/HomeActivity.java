@@ -19,11 +19,12 @@ import java.util.*;
 /** Native, offline-first launcher. Never modifies another app or claims VPN ownership. */
 public final class HomeActivity extends Activity {
  private final Handler handler=new Handler(Looper.getMainLooper());
+ private android.graphics.drawable.Drawable.ConstantState placeholderIcon;
  private AppRepository repository; private MediaBridge media; private SharedPreferences prefs;
  private final List<AppEntry> apps=new ArrayList<>(),shown=new ArrayList<>();
  private final List<String> favorites=new ArrayList<>(),order=new ArrayList<>();
  private GridView grid; private AppAdapter adapter; private TextView clock,date,mediaTitle,mediaArtist;private int columns;
- private LinearLayout mediaActions; private Button vpnButton; private boolean all,started,loaded;
+ private LinearLayout mediaActions,mediaCard; private Button vpnButton; private boolean all,started,loaded;
  private ConnectivityManager network;private boolean networkRegistered;
  private final ConnectivityManager.NetworkCallback networkCallback=new ConnectivityManager.NetworkCallback(){public void onAvailable(Network n){vpnChanged();}public void onLost(Network n){vpnChanged();}public void onCapabilitiesChanged(Network n,NetworkCapabilities c){vpnChanged();}};
  private void vpnChanged(){handler.post(()->{if(started)refreshVpn();});}
@@ -34,7 +35,7 @@ public final class HomeActivity extends Activity {
  @Override public void onCreate(Bundle state){super.onCreate(state);
   getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN|View.SYSTEM_UI_FLAG_HIDE_NAVIGATION|View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
   prefs=getSharedPreferences("atrium",MODE_PRIVATE);readList("favorites",favorites);readList("order",order);
-  repository=new AppRepository(this);media=new MediaBridge(this,this::renderMedia);build();scan();
+  placeholderIcon=getPackageManager().getDefaultActivityIcon().getConstantState();repository=new AppRepository(this);media=new MediaBridge(this,this::renderMedia);build();scan();
  }
  int dp(float n){return Math.round(n*getResources().getDisplayMetrics().density);}
  TextView text(String value,int size){TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(0xffeef4e8);return t;}
@@ -51,9 +52,9 @@ public final class HomeActivity extends Activity {
   View spacer=new View(this);header.addView(spacer,new LinearLayout.LayoutParams(0,1,1));addRow(header,button("设置",this::settings));
   LinearLayout hero=new LinearLayout(this);hero.setGravity(Gravity.CENTER_VERTICAL);LinearLayout.LayoutParams hp=new LinearLayout.LayoutParams(-1,dp(132));hp.setMargins(0,dp(12),0,dp(18));root.addView(hero,hp);
   LinearLayout timeBlock=new LinearLayout(this);timeBlock.setOrientation(LinearLayout.VERTICAL);clock=text("",56);clock.setTypeface(Typeface.create("sans-serif-light",Typeface.NORMAL));date=text("",14);date.setTextColor(0xffa8babd);timeBlock.addView(clock);timeBlock.addView(date);hero.addView(timeBlock,new LinearLayout.LayoutParams(0,-2,.38f));
-  LinearLayout card=new LinearLayout(this);card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(22),dp(12),dp(22),dp(12));card.setBackground(surface(0xff203d34));
-  LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,dp(124),.62f);hero.addView(card,cp);
-  LinearLayout labels=new LinearLayout(this);labels.setOrientation(LinearLayout.VERTICAL);mediaTitle=text("播放器",20);mediaArtist=text("",13);mediaTitle.setSingleLine(true);mediaTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);mediaArtist.setSingleLine(true);mediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);mediaArtist.setTextColor(0xffb8c8ba);labels.addView(mediaTitle);labels.addView(mediaArtist);card.addView(labels,new LinearLayout.LayoutParams(-1,0,1));
+  LinearLayout card=new LinearLayout(this);mediaCard=card;card.setOrientation(LinearLayout.VERTICAL);card.setGravity(Gravity.CENTER_VERTICAL);card.setPadding(dp(22),dp(12),dp(22),dp(12));card.setBackground(surface(0xff203d34));card.setMinimumHeight(dp(100));
+  LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(0,-2,.62f);hero.addView(card,cp);
+  LinearLayout labels=new LinearLayout(this);labels.setOrientation(LinearLayout.VERTICAL);mediaTitle=text("播放器",20);mediaArtist=text("",13);mediaTitle.setSingleLine(true);mediaTitle.setEllipsize(android.text.TextUtils.TruncateAt.END);mediaArtist.setSingleLine(true);mediaArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);mediaArtist.setTextColor(0xffb8c8ba);labels.addView(mediaTitle);labels.addView(mediaArtist);card.addView(labels,new LinearLayout.LayoutParams(-1,-2));
   mediaActions=new LinearLayout(this);mediaActions.setGravity(Gravity.END);card.addView(mediaActions,new LinearLayout.LayoutParams(-1,dp(48)));
   grid=new GridView(this);grid.setId(View.generateViewId());columns=getResources().getConfiguration().screenWidthDp>=850?6:4;grid.setNumColumns(columns);grid.setHorizontalSpacing(dp(16));grid.setVerticalSpacing(dp(14));grid.setClipToPadding(false);grid.setPadding(dp(4),dp(4),dp(4),dp(4));grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);grid.setSelector(android.R.color.transparent);
   adapter=new AppAdapter();grid.setAdapter(adapter);root.addView(grid,new LinearLayout.LayoutParams(-1,0,1));
@@ -86,7 +87,7 @@ public final class HomeActivity extends Activity {
    if(s.canPlayPause){primaryMedia=button(s.playing?"暂停":"播放",()->{if(!media.playPause())notice("会话已失效");});addRow(mediaActions,primaryMedia);}else{primaryMedia=button("打开",()->openPackage(s.packageName));addRow(mediaActions,primaryMedia);}
    if(s.canNext)addMedia("next","▶|",()->{if(!media.next())notice("此操作暂不可用");});
   }else{String last=prefs.getString("lastMedia","");mediaTitle.setText("播放器");mediaArtist.setText(last.isEmpty()?"":packageLabel(last));primaryMedia=button(last.isEmpty()?"选择播放器":"打开",()->{if(last.isEmpty())choosePlayer();else openPackage(last);});addRow(mediaActions,primaryMedia);}
-  primaryMedia.setTag("primary");for(int n=0;n<mediaActions.getChildCount();n++){View control=mediaActions.getChildAt(n);control.setNextFocusLeftId(mediaActions.getChildAt(Math.max(0,n-1)).getId());control.setNextFocusRightId(mediaActions.getChildAt(Math.min(mediaActions.getChildCount()-1,n+1)).getId());control.setNextFocusUpId(allButton.getId());control.setNextFocusDownId(grid.getId());}allButton.setNextFocusDownId(primaryMedia.getId());if(focus){View previous=focusTag==null?null:mediaActions.findViewWithTag(focusTag);if(previous!=null)previous.requestFocus();else primaryMedia.requestFocus();}
+  mediaArtist.setVisibility(mediaArtist.getText().length()==0?View.GONE:View.VISIBLE);primaryMedia.setTag("primary");for(int n=0;n<mediaActions.getChildCount();n++){View control=mediaActions.getChildAt(n);control.setNextFocusLeftId(mediaActions.getChildAt(Math.max(0,n-1)).getId());control.setNextFocusRightId(mediaActions.getChildAt(Math.min(mediaActions.getChildCount()-1,n+1)).getId());control.setNextFocusUpId(allButton.getId());control.setNextFocusDownId(grid.getId());}allButton.setNextFocusDownId(primaryMedia.getId());if(focus){View previous=focusTag==null?null:mediaActions.findViewWithTag(focusTag);if(previous!=null)previous.requestFocus();else primaryMedia.requestFocus();}
  }
  void addMedia(String tag,String title,Runnable action){Button b=button(title,action);b.setTag(tag);b.setContentDescription(tag.equals("previous")?"上一首":"下一首");addRow(mediaActions,b);}
  String packageLabel(String p){for(AppEntry a:apps)if(a.component.getPackageName().equals(p))return a.title;try{return getPackageManager().getApplicationLabel(getPackageManager().getApplicationInfo(p,0)).toString();}catch(Exception e){return "上次使用的播放器";}}
@@ -104,8 +105,11 @@ public final class HomeActivity extends Activity {
  final class AppAdapter extends BaseAdapter {
   public int getCount(){return shown.size();}public Object getItem(int p){return shown.get(p);}public long getItemId(int p){return p;}
   public View getView(int position,View reuse,android.view.ViewGroup parent){LinearLayout tile;ImageView icon;TextView label;
-   if(reuse==null){tile=new LinearLayout(HomeActivity.this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER);tile.setPadding(dp(10),dp(6),dp(10),dp(6));icon=new ImageView(HomeActivity.this);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);tile.addView(icon,new LinearLayout.LayoutParams(-1,dp(60)));label=text("",14);label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);tile.addView(label);tile.setLayoutParams(new AbsListView.LayoutParams(-1,dp(94)));}else{tile=(LinearLayout)reuse;icon=(ImageView)tile.getChildAt(0);label=(TextView)tile.getChildAt(1);}
-   AppEntry a=shown.get(position);tile.setTag(a.key());label.setText(a.title);icon.setImageDrawable(null);int color=new int[]{0xff405a4c,0xff40505f,0xff685344,0xff4c4e66}[Math.floorMod(a.component.getPackageName().hashCode(),4)];android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();GradientDrawable selected=surface(color);selected.setStroke(dp(3),0xffedffd6);states.addState(new int[]{android.R.attr.state_selected},selected);states.addState(new int[]{},surface(color));tile.setBackground(states);final LinearLayout target=tile;repository.icon(a,dp(Math.max(64,(getResources().getConfiguration().screenWidthDp-92-16*(columns-1))/columns-20)),dp(60),bitmap->{if(a.key().equals(target.getTag()))icon.setImageBitmap(bitmap);});return tile;
+   int artWidth=Math.max(64,(getResources().getConfiguration().screenWidthDp-92-16*(columns-1))/columns);
+   int artHeight=Math.round(artWidth*9f/16f);
+   if(reuse==null){tile=new LinearLayout(HomeActivity.this);tile.setOrientation(LinearLayout.VERTICAL);tile.setGravity(Gravity.CENTER);icon=new ImageView(HomeActivity.this);icon.setScaleType(ImageView.ScaleType.FIT_CENTER);icon.setDuplicateParentStateEnabled(true);icon.setClipToOutline(true);tile.addView(icon,new LinearLayout.LayoutParams(-1,dp(artHeight)));label=text("",14);label.setPadding(0,dp(6),0,0);label.setGravity(Gravity.CENTER);label.setSingleLine(true);label.setEllipsize(android.text.TextUtils.TruncateAt.END);tile.addView(label);}else{tile=(LinearLayout)reuse;icon=(ImageView)tile.getChildAt(0);label=(TextView)tile.getChildAt(1);}
+   tile.setLayoutParams(new AbsListView.LayoutParams(-1,dp(artHeight+26)));icon.getLayoutParams().height=dp(artHeight);
+   AppEntry a=shown.get(position);tile.setTag(a.key());label.setText(a.title);if(placeholderIcon!=null)icon.setImageDrawable(placeholderIcon.newDrawable(getResources()));else icon.setImageResource(android.R.drawable.sym_def_app_icon);int color=new int[]{0xff405a4c,0xff40505f,0xff685344,0xff4c4e66}[Math.floorMod(a.component.getPackageName().hashCode(),4)];android.graphics.drawable.StateListDrawable states=new android.graphics.drawable.StateListDrawable();GradientDrawable selected=surface(Color.TRANSPARENT);selected.setStroke(dp(3),0xffedffd6);states.addState(new int[]{android.R.attr.state_selected},selected);states.addState(new int[]{},surface(Color.TRANSPARENT));icon.setBackground(surface(color));icon.setForeground(states);final LinearLayout target=tile;repository.icon(a,dp(artWidth),dp(artHeight),bitmap->{if(a.key().equals(target.getTag())&&bitmap!=null)icon.setImageBitmap(bitmap);});return tile;
   }
  }
 }
