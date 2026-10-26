@@ -1,0 +1,13 @@
+.gradle/
+**/build/
+local.properties
+*.jks
+*.keystore
+signing.properties
+*.apk
+*.aab
+*.p12
+*.pfx
+*.pem
+*-password.txt
+dist/

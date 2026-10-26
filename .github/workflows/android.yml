@@ -1,0 +1,42 @@
+name: Android build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - name: Check preinstalled SDK
+        run: |
+          test -f "$ANDROID_HOME/platforms/android-34/android.jar"
+          test -x "$ANDROID_HOME/build-tools/34.0.0/apksigner"
+      - name: Build and lint
+        run: ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease lintDebug
+      - name: Verify debug APK signing
+        run: "$ANDROID_HOME/build-tools/34.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk"
+      - name: Upload build outputs
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
+        with:
+          name: atrium-build-${{ github.sha }}
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*-unsigned.apk
+            app/build/outputs/mapping/release/mapping.txt
+            app/build/reports/lint-results-debug.*
+          if-no-files-found: error
+          retention-days: 14
