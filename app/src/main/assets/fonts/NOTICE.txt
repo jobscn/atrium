@@ -1,0 +1,8 @@
+Noto Sans CJK SC Regular, version 2.004.
+Source: NotoSansCJK-Regular.ttc, face index 2, distributed by Debian fonts-noto-cjk.
+Upstream: https://github.com/notofonts/noto-cjk
+Extracted as standalone OpenType/CFF using fontTools; no glyph subsetting or outline changes.
+All original glyphs, Unicode mappings, layout tables and font names are retained.
+File name atrium-sans.otf is an application asset name, not a renamed font family.
+Licensed under SIL Open Font License 1.1; see OFL.txt.
+Other scripts or characters absent from this face require Android system fallback.
