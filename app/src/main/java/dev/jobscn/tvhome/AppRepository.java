@@ -24,8 +24,8 @@ final class AppRepository {
     ActivityInfo a=r.activityInfo;
     if(a==null||!a.enabled||!a.exported||a.packageName.equals(context.getPackageName())||byPackage.containsKey(a.packageName))continue;
     String label="";try{CharSequence value=r.loadLabel(pm);if(value!=null)label=value.toString().trim();}catch(RuntimeException ignored){}
-    if(label.isEmpty())try{CharSequence value=a.applicationInfo.loadLabel(pm);if(value!=null)label=value.toString().trim();}catch(RuntimeException ignored){}
-    if(label.isEmpty())label=a.packageName;
+    if(!hasVisibleText(label))try{CharSequence value=a.applicationInfo.loadLabel(pm);if(value!=null)label=value.toString().trim();}catch(RuntimeException ignored){}
+    if(!hasVisibleText(label))label=a.packageName;
     byPackage.put(a.packageName,new AppEntry(new ComponentName(a.packageName,a.name),label));
     }catch(RuntimeException badApp){}
    }
@@ -33,6 +33,7 @@ final class AppRepository {
   List<AppEntry> list=new ArrayList<>(byPackage.values()); list.sort((a,b)->a.title.compareToIgnoreCase(b.title));
   main.post(()->{if(!closed)result.accept(list);});
  });}
+ static boolean hasVisibleText(String text){return text!=null&&text.codePoints().anyMatch(c->!Character.isWhitespace(c)&&!Character.isSpaceChar(c)&&Character.getType(c)!=Character.FORMAT&&Character.getType(c)!=Character.CONTROL);}
  void icon(AppEntry app,int width,int height,java.util.function.Consumer<Bitmap> done){
   String key=app.key()+":"+width+"x"+height; Bitmap hit=icons.get(key); if(hit!=null){done.accept(hit);return;}
   worker.execute(()->{Bitmap bitmap=null;try{

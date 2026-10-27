@@ -45,7 +45,7 @@ export ATRIUM_STORE_PASSWORD_FILE=/private/path/store-password.txt
 export ATRIUM_KEY_ALIAS=atrium
 ./scripts/sign-release.sh \
   app/build/outputs/apk/release/app-release-unsigned.apk \
-  dist/atrium-0.1.0.apk
+  dist/atrium-0.1.1.apk
 ```
 
 If the private-key password differs from the keystore password, also set `ATRIUM_KEY_PASSWORD_FILE`. Passwords are read from private files, not command-line arguments. The script aligns the APK, signs it, verifies the signature and alignment, and creates a SHA-256 sidecar. A release certificate is self-signed; it is an app update identity, not an assertion of Google Play review or identity verification.
@@ -61,14 +61,14 @@ CI checks are not device acceptance testing. Verify the signed APK on the target
 An SDK installation may optionally include `emulator` and `system-images;android-34;android-tv;x86`. Check any presented license before accepting. Create an Android TV AVD through Android Studio or `avdmanager`; launch it with the installed `emulator` tool, then:
 
 ```sh
-adb install -r dist/atrium-0.1.0.apk
+adb install -r dist/atrium-0.1.1.apk
 adb shell am start -n dev.jobscn.tvhome/.HomeActivity
 adb exec-out screencap -p > native-home.png
 ```
 
 For D-pad validation use a remote or `adb shell input keyevent KEYCODE_DPAD_RIGHT` / `KEYCODE_DPAD_CENTER` / `KEYCODE_BACK`. Emulator screenshots demonstrate native rendering, not compatibility with every manufacturer TV.
 
-Some official Android TV images are `user` builds with debugging disabled by default. Their emulator may finish booting while ADB still reports `offline`; do not disable authentication or alter system security properties to work around this. Enable debugging through the supported device UI when available.
+An `offline` ADB transport does not establish a root cause; startup may still be in progress. Inspect current boot and transport state rather than inferring a security setting. Never disable authentication or alter system security properties to work around a failed connection.
 
 For native layout and interaction testing without a TV ROM, the official AOSP development image `system-images;android-34;default;x86_64` can run with a 1920×1080, 320-dpi landscape AVD profile. This is a genuine Android runtime but **not** a Xiaomi TV or an Android TV ROM compatibility test. Label screenshots accordingly, and keep actual-TV acceptance testing separate.
 
@@ -80,3 +80,7 @@ For native layout and interaction testing without a TV ROM, the official AOSP de
 - [Android SDK manager](https://developer.android.com/tools/sdkmanager)
 - [Android SDK terms](https://developer.android.com/studio/terms)
 - [GitHub Ubuntu 24.04 runner software](https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md)
+
+## Typography
+
+The app bundles one complete Noto Sans CJK SC Regular font under OFL 1.1, including Latin and digits. This supports dynamic Chinese application names rather than only fixed UI strings. The font is about 15.68 MiB uncompressed and adds about 13 MiB to the compressed APK. Uncovered rare Unicode characters or other scripts may use Android fallback. Font attribution and license are in `app/src/main/assets/fonts/`.
